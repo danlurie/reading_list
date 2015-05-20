@@ -13,7 +13,7 @@ list_path = sys.argv[3]
 # Open a new file to write output to
 lines = open(file_path, 'r').read().splitlines()
 # Match DOIs in Frontiers URLs.
-fdoix = re.compile('10[.][0-9]{4,}[/][f][a-z]{3,}[.][0-9]{3,}[.][0-9]{4,}')
+frnt_doi_rgx = re.compile('10[.][0-9]{4,}[/][f][a-z]{3,}[.][0-9]{3,}[.][0-9]{4,}')
 # Match non-standard formatting of journal title in Frontiers site titles.
 fjtx = re.compile('\s\|\s.*')
 # Match PMID in PubMed URLs.
@@ -22,7 +22,7 @@ pmtx = re.compile('\/pubmed\/\?term\=[0-9]+')
 # Set the base URL for the Entrez summary API.
 pmapi_base = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=xml&rettype=abstract&id='
 # Match DOI in JOCN URLs.
-jocnx = re.compile('10\.1162\/jocn\_a\_[0-9]{3,}')
+jocn_doi_rgx = re.compile('10\.1162\/jocn\_a\_[0-9]{3,}')
 
 # Scrape input file for URLs
 url_list = []
@@ -56,24 +56,68 @@ for idx, url in enumerate(url_list):
     
     # Attempt to process the URL.
     
-    # First, try to identify the source and clean up the URL.
-    try:
+item_df = pd.DataFrame.from_records(item_tups, columns=['title', 'article_type', 'citations', 'doi', 'url'])
+item_df.to_csv(out_path, index=None)
+
+
+
+class Article():
+
+    def __init__(self, url):
+        self.url = url
+
+    self.source = check_source(self.url)
+
+    if self.source == 'unknown':
+        self.title = get_title(self.url)
+    elif self.source == 'frontiers':
+
+
+    def check_source(self, url):
         # Check if source is Frontiers.
         if 'frontiersin.org' in url:
-            source = 'frontiers'
-            # Try to scrape the DOI from original URL.
-            doi_res = fdoix.search(url)
-            # If a DOI was found, generate a clean URL for this item.
+            return 'frontiers'
+        # Check if source is Pubmed.
+        elif 'ncbi.nlm.nih.gov' and '/pubmed/' in url:
+            return 'pubmed'          
+        # Check if source is JOCN.
+        elif 'mitpressjournals.org' and 'jocn' in url:
+            return 'jocn'
+        # All other sources are considered 'unknown'.
+        else:
+            return 'unknown'
+
+    def get_pmid
+
+    def get_pmcid
+    
+    def get_doi(self, url, source):
+        try:
+            if source == 'frontiers':                
+                doi = frnt_doi_rgx.search(url).group()
+            elif source == 'jocn': 
+                doi = jocn_doi_rgx.search(url).group()
+        except:
+            print("Unable to identify DOI.")
+            return 'unknown'
+            pass
+        else:
+            return doi
+
+
+
+    def get_clean_url(self, url, source, doi):
+             # Try to scrape the DOI from original URL.
+            doi_res =             # If a DOI was found, generate a clean URL for this item.
             if doi_res:
                 fdoi = doi_res.group()
                 url = '/'.join(['http://journal.frontiersin.org/article', fdoi, 'full'])
             else:
                 pass
 
-        # Check if source is Pubmed.
-        if 'ncbi.nlm.nih.gov' and '/pubmed/' in url:
-            source = 'pubmed'
-            # Try to scrape the PMID from original URL.
+
+
+             # Try to scrape the PMID from original URL.
             pmid_res = pmidx.search(url)
             pmtx_res = pmtx.search(url)
             # If a PMID was found, generate a clean URL for this item.
@@ -85,19 +129,8 @@ for idx, url in enumerate(url_list):
                 url = '/'.join(['http://www.ncbi.nlm.nih.gov/pubmed', pmid])
             else:
                 pass
-        
 
 
-    else:
-        try:
-            # Attempt to identify article source, and if possible, generate a clean URL.
-
-            
-            
-                       
-            # Check if source is JOCN
-            elif 'mitpressjournals.org' and 'jocn' in url:
-                source = 'jocn'
 
             # Parse Pubmed articles
             if source == 'pubmed':
@@ -113,10 +146,72 @@ for idx, url in enumerate(url_list):
                     title = tree[0][6].text
                     item_tups.append((title, url))
 
+
+
+
+            
+        elif source == 'frontiers':
+        elif source == 'jocn':
+
+
+
+
+             # Parse Pubmed articles
+            if source == 'pubmed':
+                pmapi_url = ''.join([pmapi_base, pmid])
+                try:
+                    esummary = requests.get(pmapi_url, timeout=15).text
+                except requests.exceptions.RequestException as e:
+                    print "Error loading summary info for PMID %s." % pmid
+                    item_tups.append(('Unable to load Entrez for PMID %s.' % pmid, url))
+                    pass
+                else:
+                    tree = ET.fromstring(str(esummary.encode('utf-8')))
+                    title = tree[0][6].text
+                    item_tups.append((title, url))
+
+
+
+    
+    def get_title(self, url):
+        try:
+            response = BeautifulSoup(requests.get(url, timeout=15).text)       
+        except requests.exceptions.RequestException as e:
+            print "Error loading %s." % url
+            pass
+        else:
+            return str(response.title.text.encode("utf-8")).strip()
+
+
+
+        self.title = title
+        self.doi = doi
+
+        if self.source = 'pubmed':
+            self.pmid = get_pmid(self.url)
+        self.pmid = pmid
+        self.article_type = article_type
+        self.article_source = article_source
+        self.citations = citations
+
+
+
+    # First, try to identify the source and clean up the URL.
+           
+
+
+    else:
+        try:
+            # Attempt to identify article source, and if possible, generate a clean UR     
+                       
+           
+source = 'frontiers'
+           
+
+
             # Parse JOCN articles
             elif source == 'jocn':
-                doi = jocnx.search(url).group()
-                crapi_url = ''.join(['http://api.crossref.org/works/', doi])
+                                crapi_url = ''.join(['http://api.crossref.org/works/', doi])
                 try:
                     refsum = requests.get(crapi_url, timeout=15).text
                 except requests.exceptions.RequestException as e:
@@ -149,11 +244,4 @@ for idx, url in enumerate(url_list):
             print "Error processing %s!" % url
             item_tups.append(('Unknown Error', url))
             pass
-item_df = pd.DataFrame.from_records(item_tups, columns=['title', 'article_type', 'citations', 'doi', 'url'])
-item_df.to_csv(out_path, index=None)
 
-
-
-class article
-
-attributes URL, doi, pmid, title, citation, article_type, source
